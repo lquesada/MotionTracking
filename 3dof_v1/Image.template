@@ -1,0 +1,414 @@
+#ifndef __IMAGE_H__
+#define __IMAGE_H__
+
+#include "BWPixel.h"
+#include "RGBPixel.h"
+#include "Filter.h"
+#include <stdio.h>
+#include <math.h>
+
+template <class T>
+class Image {
+
+  int w;
+  int h;
+  T *data;
+
+  Image<BWPixel> *newOrReuse(Image<BWPixel> **reuse,int w,int h) const {
+    if ((reuse) && (*reuse) && (w==(**reuse).getW() && h==(**reuse).getH()))
+      return *reuse;
+    else {
+      if ((reuse) && (*reuse))
+        delete *reuse;
+      *reuse = new Image<BWPixel>;
+      (**reuse).allocate(w,h);
+      return *reuse;
+    }
+  }
+
+  Image<RGBPixel> *newOrReuse(Image<RGBPixel> **reuse,int w,int h) const {
+    if ((reuse) && (*reuse) && (w==(**reuse).getW() && h==(**reuse).getH()))
+      return *reuse;
+    else {
+      if ((reuse) && (*reuse))
+        delete *reuse;
+      *reuse = new Image<RGBPixel>;
+      (**reuse).allocate(w,h);
+      return *reuse;
+    }
+  }
+
+  public:
+
+  Image<T>() {
+    w = h = 0;
+    data = (T *)0;
+  }
+
+  ~Image<T>() {
+    clean();
+  }
+
+  Image<T>(const Image<T> &a) {
+    data = 0;
+    *this = a;
+  }
+
+  Image<T> &operator=(const Image<T> &a) {
+    clean();
+    w = a.getW();
+    h = a.getH();
+    data = new T[w*h];
+    for (int i = 0;i < h;i++)
+      for (int j = 0;j < w;j++)
+        get(j,i) = a.get(j,i);
+    return *this;
+  }
+
+  void allocate(int w,int h) {
+    clean();
+    this->w = w;
+    this->h = h;
+    data = new T[w*h];
+  }
+
+  void clean() {
+    if (data)
+      delete[] data;
+    w = h = 0;
+    data = (T *)0;
+  }
+
+
+  void blank() {
+    for (int i = 0;i < h;i++)
+      for (int j = 0;j < w;j++)
+        get(j,i).setV(0);
+  }
+
+  Image<BWPixel> *toBlackAndWhiteImage(Image<BWPixel> **reuse) const {
+    Image<BWPixel> *ret = newOrReuse(reuse,w,h);
+    for (int i = 0;i < h;i++)
+      for (int j = 0;j < w;j++)
+        (*ret).get(j,i).setV(get(j,i).getV());
+    return ret;
+  }
+
+  Image<RGBPixel> *toBlackAndWhiteColorImage(Image<RGBPixel> **reuse) const {
+    Image<RGBPixel> *ret = newOrReuse(reuse,w,h);
+    for (int i = 0;i < h;i++)
+      for (int j = 0;j < w;j++)
+        (*ret).get(j,i).setV(get(j,i).getV());
+    return ret;
+  }
+
+  Image<RGBPixel> *toColorImage(Image<RGBPixel> **reuse) const {
+    Image<RGBPixel> *ret = newOrReuse(reuse,w,h);
+    for (int i = 0;i < h;i++)
+      for (int j = 0;j < w;j++)
+        (*ret).get(j,i).setRGB(get(j,i).getR(),get(j,i).getG(),get(j,i).getB());
+    return ret;
+  }
+
+  Image<T> *filter(const Filter &a,Image<T> **reuse) const {
+    Image<T> *ret = newOrReuse(reuse,w,h);
+    int cx = a.getW()/2;
+    int cy = a.getH()/2;
+    int nx;
+    int ny;
+    T p;
+    double d;
+    double r,g,b;
+    for (int i = 0;i < h;i++) {
+      for (int j = 0;j < w;j++) {
+        r = g = b = 0;
+        for (int y = 0;y < a.getH();y++) {
+          for (int x = 0;x < a.getW();x++) {
+            nx = j-cx+x;
+            ny = i-cy+y;
+            if (nx < 0)
+              nx = -nx;
+            else if (nx >= w)
+              nx = 2*w-nx-1;
+            if (ny < 0)
+              ny = -ny;
+            else if (ny >= h)
+              ny = 2*h-ny-1;
+            p = get(nx,ny);
+            d = a.get(x,y);
+            r += ((double)p.getR())*d;
+            g += ((double)p.getG())*d;
+            b += ((double)p.getB())*d;
+          }
+        }
+        (*ret).get(j,i).setRGB((int)r,(int)g,(int)b);
+      }
+    }
+    return ret;
+  }
+
+  Image<T> *filterDiff(const Filter &a,Image<T> **reuse) const {
+    Image<T> *ret = newOrReuse(reuse,w,h);
+    int cx = a.getW()/2;
+    int cy = a.getH()/2;
+    int nx;
+    int ny;
+    T p;
+    double d;
+    double r,g,b;
+    for (int i = 0;i < h;i++) {
+      for (int j = 0;j < w;j++) {
+        r = g = b = 0;
+        for (int y = 0;y < a.getH();y++) {
+          for (int x = 0;x < a.getW();x++) {
+            nx = j-cx+x;
+            ny = i-cy+y;
+            if (nx < 0)
+              nx = -nx;
+            else if (nx >= w)
+              nx = 2*w-nx-1;
+            if (ny < 0)
+              ny = -ny;
+            else if (ny >= h)
+              ny = 2*h-ny-1;
+            p = get(nx,ny);
+            d = a.get(a.getW()-1-x,a.getH()-1-y);
+            r += ((double)p.getR())*d;
+            g += ((double)p.getG())*d;
+            b += ((double)p.getB())*d;
+          }
+        }
+        r += 255;
+        g += 255;
+        b += 255;
+        r /= 2;
+        g /= 2;
+        b /= 2;
+        r = (r>255?255:r);
+        g = (g>255?255:g);
+        b = (b>255?255:b);
+        r = (r<0?0:r);
+        g = (g<0?0:g);
+        b = (b<0?0:b);
+        (*ret).get(j,i).setRGB((int)r,(int)g,(int)b);
+      }
+    }
+    return ret;
+  }
+
+  Image<T> *sobel(Image<T> *sobeladax,Image<T> *sobeladay,Image<T> **reuse) const {
+    Image<T> *ret = newOrReuse(reuse,w,h);
+    double r,g,b;
+    double aux;
+    double aux2;
+    for (int i = 0;i < h;i++) {
+      for (int j = 0;j < w;j++) {
+        aux = (double)((*sobeladax).get(j,i).getR())-127.0;
+        aux2 = (double)((*sobeladay).get(j,i).getR())-127.0;
+        r = (sqrt(aux*aux+aux2*aux2)/181.02)*255;
+        aux = (double)((*sobeladax).get(j,i).getG())-127.0;
+        aux2 = (double)((*sobeladay).get(j,i).getG())-127.0;
+        g = (sqrt(aux*aux+aux2*aux2)/181.02)*255;
+        aux = (double)((*sobeladax).get(j,i).getB())-127.0;
+        aux2 = (double)((*sobeladay).get(j,i).getB())-127.0;
+        b = (sqrt(aux*aux+aux2*aux2)/181.02)*255;
+        (*ret).get(j,i).setRGB((int)r,(int)g,(int)b);
+      }
+    }
+    return ret;
+  }
+
+  Image<T> *fastSobel(Image<T> **reuse) const {
+    Image<T> *ret = newOrReuse(reuse,w,h);
+    for (int i = 0;i < w;i++) {
+      (*ret).get(i,0).setV(0);
+      (*ret).get(i,h-1).setV(0);
+    }
+    for (int j = 0;j < h;j++) {
+      (*ret).get(0,j).setV(0);
+      (*ret).get(w-1,j).setV(0);
+    }
+    int sx = h-1;
+    int sy = w-1;
+    int max = 0;
+    for(int j = 1;j < sy;++j) {
+      for(int i = 1;i < sx;++i) {
+        (*ret).get(j,i).setRGB(
+(  abs((get(j-1,i-1).getR() + 2*get(j,i-1).getR() + get(j+1,i-1).getR()) - (get(j-1,i+1).getR() + 2*get(j,i+1).getR() + get(j+1,i+1).getR()))+
+  abs((get(j-1,i-1).getR() + 2*get(j-1,i).getR() + get(j-1,i+1).getR()) - (get(j+1,i-1).getR() + 2*get(j+1,i).getR() + get(j+1,i+1).getR())) ) / 4
+,
+(  abs((get(j-1,i-1).getG() + 2*get(j,i-1).getG() + get(j+1,i-1).getG()) - (get(j-1,i+1).getG() + 2*get(j,i+1).getG() + get(j+1,i+1).getG()))+
+  abs((get(j-1,i-1).getG() + 2*get(j-1,i).getG() + get(j-1,i+1).getG()) - (get(j+1,i-1).getG() + 2*get(j+1,i).getG() + get(j+1,i+1).getG())) ) / 4
+,
+(  abs((get(j-1,i-1).getB() + 2*get(j,i-1).getB() + get(j+1,i-1).getB()) - (get(j-1,i+1).getB() + 2*get(j,i+1).getB() + get(j+1,i+1).getB()))+
+  abs((get(j-1,i-1).getB() + 2*get(j-1,i).getB() + get(j-1,i+1).getB()) - (get(j+1,i-1).getB() + 2*get(j+1,i).getB() + get(j+1,i+1).getB())) ) / 4
+);
+      }
+    }
+    return ret;
+  }
+
+  Image<T> *subSample(int wratio,int woffset,int hratio,int hoffset,Image<T> **reuse) const {
+    Image<T> *ret = newOrReuse(reuse,w/wratio,h/hratio);
+    int idst = 0;
+    int jdst = 0;
+    for (int i = hoffset;i < h;i+=hratio) {
+      jdst = 0;
+      for (int j = woffset;j < w;j+=wratio) {
+        (*ret).get(jdst,idst) = get(j,i);
+        jdst++;
+      }
+      idst++;
+    }
+    return ret;
+  }
+
+  Image<T> *normalizeAgainst(const Image<T> &a,Image<T> **reuse) const {
+    Image<T> *ret = newOrReuse(reuse,w,h);
+    int mymean;
+    int othermean;
+    for(int j = 0;j < w;++j) {
+      for(int i = 0;i < h;++i) {
+        mymean += get(j,i).getV(); 
+        othermean += a.get(j,i).getV(); 
+      }
+    }
+    mymean /= w*h;
+    othermean /= w*h;
+    int diff = othermean-mymean;
+    int r;
+    int g;
+    int b;
+    for(int j = 0;j < w;++j) {
+      for(int i = 0;i < h;++i) {
+        r = get(j,i).getR()+diff;
+        r = (r>0?(r<255?r:255):0);
+        g = get(j,i).getG()+diff;
+        g = (g>0?(g<255?g:255):0);
+        b = get(j,i).getB()+diff;
+        b = (b>0?(b<255?b:255):0);
+        (*ret).get(j,i).setRGB(r,g,b);
+      }
+    }
+    return ret;
+  }
+
+  Image<T> *fastShrink(Image<T> **reuse) const {
+    Image<T> *ret = newOrReuse(reuse,w/4,h/4);
+    int idst = 0;
+    int jdst = 0;
+    for (int i = 2;i < h;i+=4) {
+      jdst = 0;
+      for (int j = 2;j < w;j+=4) {
+        (*ret).get(jdst,idst).setRGB(
+(2*get(j,i).getR()+get(j-1,i).getR()+get(j+1,i).getR()+get(j,i-1).getR()+get(j,i+1).getR())/6
+,
+(2*get(j,i).getG()+get(j-1,i).getG()+get(j+1,i).getG()+get(j,i-1).getG()+get(j,i+1).getG())/6
+,
+(2*get(j,i).getB()+get(j-1,i).getB()+get(j+1,i).getB()+get(j,i-1).getB()+get(j,i+1).getB())/6
+);
+        jdst++;
+      }
+      idst++;
+    }
+    return ret;
+  }
+
+  Image<RGBPixel> *superSample(int wratio,int hratio,Image<RGBPixel> **reuse) const {
+    Image<RGBPixel> *ret = newOrReuse(reuse,w*wratio,h*hratio);
+    int idst = 0;
+    int jdst = 0;
+    for (int i = 0;i < (*ret).getH();i++) {
+      for (int j = 0;j < (*ret).getW();j++) {
+        (*ret).get(j,i) = get(j/wratio,i/hratio);
+      }
+    }
+    return ret;
+  }
+
+  Image<T> *lowPassRGBFilter(const Image &a,int value,Image<T> **reuse) const {
+    Image<T> *ret = newOrReuse(reuse,w,h);
+    RGBPixel p;
+    for (int i = 0;i < h;i++) {
+      for (int j = 0;j < w;j++) {
+        p = get(j,i);
+        (*ret).get(j,i).setRGB(
+          (p.getR()>value?0:p.getR()),
+          (p.getG()>value?0:p.getG()),
+          (p.getB()>value?0:p.getB())
+        );
+      }
+    }
+    return ret;
+  }
+
+  Image<T> *highPassRGBFilter(const Image &a,char value,Image<T> **reuse) const {
+    Image<T> *ret = newOrReuse(reuse,w,h);
+    RGBPixel p;
+    for (int i = 0;i < h;i++) {
+      for (int j = 0;j < w;j++) {
+        p = get(j,i);
+        (*ret).get(j,i).setRGB(
+          (p.getR()<value?0:p.getR()),
+          (p.getG()<value?0:p.getG()),
+          (p.getB()<value?0:p.getB())
+        );
+      }
+    }
+    return ret;
+  }
+
+  Image<T> *lowPassAverageFilter(const Image &a,char value,Image<T> **reuse) const {
+    Image<T> *ret = newOrReuse(reuse,w,h);
+    RGBPixel p;
+    for (int i = 0;i < h;i++) {
+      for (int j = 0;j < w;j++) {
+        p = get(j,i);
+        (*ret).get(j,i).setV((p.getV()>value?0:p.getV()));
+      }
+    }
+    return ret;
+  }
+
+  Image<T> *highPassAverageFilter(char value,Image<T> **reuse) const {
+    Image<T> *ret = newOrReuse(reuse,w,h);
+    RGBPixel p;
+    for (int i = 0;i < h;i++) {
+      for (int j = 0;j < w;j++) {
+        p = get(j,i);
+        (*ret).get(j,i).setV((p.getV()<value?0:p.getV()));
+      }
+    }
+    return ret;
+  }
+
+  Image<T> *andFilter(const Image<T> &a,Image<T> **reuse) const {
+    Image<T> *ret = newOrReuse(reuse,w,h);
+    int val,val2;
+    for (int i = 0;i < h;i++) {
+      for (int j = 0;j < w;j++) {
+        val = get(j,i).getV();
+        val2 = a.get(j,i).getV();
+        (*ret).get(j,i).setV((val<val2?val:val2));
+      }
+    }
+    return ret;
+  }
+
+  inline T &get(int x,int y) { return data[x+y*w]; }
+
+  inline const T &get(int x,int y) const { return data[x+y*w]; }
+
+
+  inline int getW() const { return w; }
+
+  inline int getH() const { return h; }
+
+  inline const void *getData() const { return (const void *)data; }
+  inline void *getData() { return (void *)data; }
+
+
+};
+
+#endif
+
