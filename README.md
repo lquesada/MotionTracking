@@ -2,6 +2,8 @@ MotionTracking tools
 
 Copyright (c) 2010-2013, Luis Quesada Torres - https://github.com/lquesada | www.luisquesada.com
 
+Paper at https://doi.org/10.1142/S0129065712500190
+
 osg_webcam
 ==========
 
